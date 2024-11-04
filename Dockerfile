@@ -1,23 +1,32 @@
-# Використовуємо офіційний образ Alpine Linux
-FROM alpine:latest
+# Вказуємо базовий образ з Node.js (версію можна змінити при необхідності)
+FROM node:20
 
-# Оновлення індексу пакетів і встановлення Nginx
-RUN apk update && apk add nginx
+# Встановлюємо робочу директорію в контейнері
+WORKDIR /app
 
-# Видалення стандартної сторінки Nginx
-RUN rm -rf /usr/share/nginx/html/*
+# Копіюємо package.json та package-lock.json (якщо є) для інсталяції залежностей
+COPY package*.json ./
 
-# Копіюємо артефакт (dist) у каталог Nginx
-COPY ./dist /usr/share/nginx/html/
+# Встановлюємо залежності
+RUN npm install
 
-# Видаляємо попередню конфігурацію Nginx що стоїть по замовчуванню
-RUN rm -f /etc/nginx/http.d/default.conf
+# Копіюємо всі файли проєкту в контейнер
+COPY . .
 
-# Завантажуємо власну конфігурацію Nginx в образ
-COPY ./nginx.conf /etc/nginx/http.d/
+# Компілюємо додаток для production
+RUN npm run build
 
-# Відкриваємо порт 80 для HTTP
+# Використовуємо Nginx для сервування статичних файлів
+FROM nginx:stable-alpine
+
+# Копіюємо згенеровані статичні файли з попереднього контейнера до папки Nginx
+COPY --from=0 /app/dist /usr/share/nginx/html
+
+# Копіюємо налаштування Nginx (необов'язково, якщо потрібно змінити налаштування)
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Відкриваємо порт 80 для доступу до сервера
 EXPOSE 80
 
-# Запускаємо Nginx у фоновому режимі при запуску контейнера
+# Запускаємо Nginx
 CMD ["nginx", "-g", "daemon off;"]
